@@ -1,0 +1,956 @@
+---
+title: "Lab Name"
+author: "Author Name"
+date: "`r Sys.Date()`"
+output: openintro::lab_report
+---
+
+```{r load-packages, echo=TRUE, message=FALSE}
+
+setwd("~/Documents/Data and Society/Data and Society")
+
+library(tidyverse)
+library(readr)
+library(stringr)
+library(geojsonR)
+library(leaflet) 
+library(RColorBrewer)
+library(ggmap)
+library(sf)
+library(wesanderson)
+library(corrr)
+library(ggcorrplot)
+library(FactoMineR)
+library(factoextra)
+
+
+job_access_gap_dict <- read_csv("job_access_gap_dict.csv")
+job_access_gap_2_ <- read_csv("job_access_gap (2).csv")
+job_access_gap_equity <- read_csv("job_access_gap_equity.csv")
+job_access_gap_equity_dict <- read_csv("job_access_gap_equity_dict.csv")
+job_access_geojson <- FROM_GeoJson(url_file_string = "https://urban-data-catalog.s3.amazonaws.com/drupal-root-live/2021/04/15/job_access_gap.geojson")
+varblocks2018<- read_csv("varblocks2018.csv")
+finality3 <- read_csv("finality3.csv")
+
+access_json <- read_sf("https://urban-data-catalog.s3.amazonaws.com/drupal-root-live/2021/04/15/job_access_gap.geojson") %>%
+  dplyr::filter(MSA == "Seattle" | MSA == "Baltimore") %>%
+  mutate(GEOID = as.double(GEOID))
+
+Spatial <- read_csv("Spatial.csv")
+  
+
+
+```
+
+### Exercise 1
+
+
+
+```{r code-chunk-label, echo=TRUE}
+
+job_access_gap_new <- left_join(job_access_gap_equity, job_access_gap_2_, by= c('cbsa_name' = 'MSA'))
+
+Access_new<-job_access_gap_new %>%
+    pivot_longer(cols = c(pctasian, pctblack, pcthispanic,pctwhite, pctother, pctnonwhite), names_to = "race", values_to= "value")
+
+job_access_gap_Seattle<- job_access_gap_new %>%
+  filter(cbsa_name == "Seattle") %>%
+  relocate(cbsa_name) %>%
+  select(cbsa_name, Access30Transit, OverallJobAccess, pctasian, pctblack, pcthispanic,pctwhite,pctother,pctnonwhite, spatialmismatch)
+
+
+boxplot(Access30Transit~cbsa_name, data = job_access_gap_new)
+
+
+boxplot(OverallJobAccess~cbsa_name, data = job_access_gap_new)
+
+boxplot(spatialmismatch ~ cbsa_name , data=job_access_gap_new)
+
+
+```
+
+
+```{r eval=FALSE, include=FALSE}
+
+race_groupedSeattle<-job_access_gap_equity %>%
+  select(type, pctasian,pctblack,pcthispanic,pctwhite,cbsa_name) %>%
+  filter(cbsa_name == "Seattle" ) %>%
+  pivot_longer(c(pctasian,pcthispanic, pctblack,pctwhite),
+               names_to = "Race",
+               values_to = "Percentages")
+
+race_groupedBaltimore<-job_access_gap_equity %>%
+  select(type, pctasian,pctblack,pcthispanic,pctwhite,cbsa_name) %>%
+  filter(cbsa_name == "Baltimore" ) %>%
+  pivot_longer(c(pctasian,pcthispanic, pctblack,pctwhite),
+               names_to = "Race",
+               values_to = "Percentages")
+  
+  
+
+  
+  
+  race_groupedSeattle%>%
+  ggplot(mapping = aes(x=Race, y= Percentages , fill = type)) +
+  geom_bar( position = "dodge", stat = "identity", ) +
+  labs(title = "Comparing Spatial Mismatch in Seattle",
+       subtitle = "General versus Worst Grouped by Race",
+       x = "Racial Groups",
+       y= "Percentages")+
+  scale_fill_manual(values=wes_palette(n=4, name="GrandBudapest2"))+
+    scale_x_discrete( limits = c("pctwhite", "pctasian", "pcthispanic", "pctblack"),
+                      labels = c("White", "Asian","Hispanic", "Black")
+                    
+    )
+
+  
+  race_groupedBaltimore%>%
+  ggplot(mapping = aes(x=Race, y= Percentages , fill = type)) +
+  geom_bar( position = "dodge", stat = "identity", ) +
+  labs(title = "Comparing Spatial Mismatch in Baltimore",
+       subtitle = "General versus Worst Grouped by Race",
+       x = "Racial Groups",
+       y= "Percentages")+
+      scale_fill_manual(values=wes_palette(n=4, name="GrandBudapest2"))+
+      scale_x_discrete( limits = c("pctwhite", "pctblack", "pcthispanic", "pctasian"),
+                      labels = c("White", "Black","Hispanic", "Asian")
+                    
+    )
+```
+
+
+```{r eval=FALSE, include=FALSE}
+
+
+POCwhite_equitySeattle<-job_access_gap_equity %>%
+  select(type,pctwhite, pctnonwhite, cbsa_name) %>%
+  filter(cbsa_name == "Seattle" ) %>%
+  pivot_longer(c(pctwhite,pctnonwhite),
+               names_to = "Race",
+               values_to = "Percentages")
+
+
+POCwhite_equitySeattle%>%
+  ggplot(mapping = aes(x=Race, y= Percentages , fill = type)) +
+  geom_bar( position = "dodge", stat = "identity", ) +
+  labs(title = "Comparing Spatial Mismatch in Seattle",
+       subtitle = "General versus Worst Grouped by Race",
+       x = "Racial Groups",
+       y= "Percentages") +
+   scale_fill_manual(values=wes_palette(n=4, name="GrandBudapest2"))+
+    scale_x_discrete( limits = c("pctwhite", "pctnonwhite"),
+                      labels = c("White", "People of Color")
+                    
+    )
+
+
+
+
+POCwhite_equityBaltimore<-job_access_gap_equity %>%
+  select(type,pctwhite, pctnonwhite, cbsa_name) %>%
+  filter(cbsa_name == "Baltimore" ) %>%
+  pivot_longer(c(pctwhite,pctnonwhite),
+               names_to = "Race",
+               values_to = "Percentages")
+
+
+POCwhite_equityBaltimore%>%
+  ggplot(mapping = aes(x=Race, y= Percentages , fill = type)) +
+  geom_bar( position = "dodge", stat = "identity", ) +
+  labs(title = "Comparing Spatial Mismatch in Baltimore",
+       subtitle = "General versus Worst Grouped by Race",
+       x = "Racial Groups",
+       y= "Percentages") +
+   scale_fill_manual(values=wes_palette(n=4, name="GrandBudapest2"))+
+    scale_x_discrete( limits = c("pctnonwhite", "pctwhite"),
+                      labels = c("People of Color", "White")
+    )
+                    
+
+
+```
+
+
+### Exercise 2
+
+```{r echo=TRUE}
+
+
+finality<-finality3 %>%
+ select(GEOID, spatialmismatch, MSA, geometry, WhiteProp, BlackProp, AsianProp, HispanicProp,hsdiplomaProp, hsnodiplomaProp, college1Prop, somecollegeProp, assProp, bachelorProp ) 
+
+
+Seattle_finality<- finality %>%
+  filter(MSA == "Seattle")
+
+Baltimore_finality<- finality %>%
+  filter(MSA == "Baltimore")
+
+Spatial <- Spatial %>%
+  select(MSA,hsdiplomaProp, college1Prop, somecollegeProp, assProp, bachelorProp, GEDProp, p12Prop, WhiteProp, POCProp) 
+
+Seattle_spatial <- Spatial %>%
+  filter(MSA == "Seattle") %>%
+  select(-MSA)
+  
+
+Baltimore_spatial <- Spatial %>%
+  filter(MSA == "Baltimore")%>%
+  select(-MSA)
+  
+
+
+
+
+
+
+```
+
+
+
+
+
+### Overall 
+
+
+```{r eval=FALSE, include=FALSE}
+
+cor.test(finality$spatialmismatch, finality$WhiteProp)
+
+overallm1<-lm(spatialmismatch~WhiteProp, data= finality)
+
+summary(overallm1)
+
+```
+
+### Seattle 
+
+Observing how raceproportion significance on spatial mismatch with correlation testing. 
+
+```{r eval=FALSE, include=FALSE}
+
+cor.test(Seattle_finality$spatialmismatch, Seattle_finality$WhiteProp)
+cor.test(Seattle_finality$spatialmismatch, Seattle_finality$BlackProp)
+cor.test(Seattle_finality$spatialmismatch, Seattle_finality$AsianProp)
+cor.test(Seattle_finality$spatialmismatch, Seattle_finality$HispanicProp)
+
+
+Seattle_raceall<- lm(spatialmismatch~ WhiteProp +BlackProp +AsianProp +HispanicProp, data = Seattle_finality)
+summary(Seattle_raceall)
+
+Seattle_racesome <- lm(spatialmismatch~WhiteProp+AsianProp, data = Seattle_finality)
+summary(Seattle_racesome)
+
+
+```
+
+```{r eval=FALSE, include=FALSE}
+
+cor.test(Seattle_finality$spatialmismatch, Seattle_finality$hsdiplomaProp)
+cor.test(Seattle_finality$spatialmismatch, Seattle_finality$hsnodiplomaProp)
+cor.test(Seattle_finality$spatialmismatch, Seattle_finality$college1Prop)
+cor.test(Seattle_finality$spatialmismatch, Seattle_finality$somecollegeProp)
+cor.test(Seattle_finality$spatialmismatch, Seattle_finality$assProp)
+cor.test(Seattle_finality$spatialmismatch, Seattle_finality$bachelorProp)
+
+
+Seattle_edall<- lm(spatialmismatch~ hsdiplomaProp + hsnodiplomaProp + college1Prop + somecollegeProp + assProp+ bachelorProp, data = Seattle_finality)
+summary(Seattle_edall)
+
+Seattle_edsome<- lm(spatialmismatch~ hsdiplomaProp + college1Prop + bachelorProp, data = Seattle_finality)
+summary(Seattle_edsome)
+
+Seattle_edrefined<- lm(spatialmismatch ~ college1Prop +bachelorProp, data = Seattle_finality)
+
+
+
+
+```
+
+```{r eval=FALSE, include=FALSE}
+
+
+Seattle_all <- lm(spatialmismatch ~ WhiteProp + BlackProp +AsianProp + HispanicProp + hsdiplomaProp + hsnodiplomaProp + college1Prop + somecollegeProp + assProp+ bachelorProp, data = Seattle_finality)
+
+step.model <- MASS::stepAIC(Seattle_all, direction = "both", 
+                      trace = FALSE)
+summary(step.model)
+```
+
+
+
+### Baltimore
+
+```{r eval=FALSE, include=FALSE}
+cor.test(Baltimore_finality$spatialmismatch, Baltimore_finality$WhiteProp)
+cor.test(Baltimore_finality$spatialmismatch, Baltimore_finality$BlackProp)
+cor.test(Baltimore_finality$spatialmismatch, Baltimore_finality$AsianProp)
+cor.test(Baltimore_finality$spatialmismatch, Baltimore_finality$HispanicProp)
+
+
+Baltimore_raceall<- lm(spatialmismatch~ WhiteProp +BlackProp +AsianProp +HispanicProp, data = Baltimore_finality)
+summary(Baltimore_raceall)
+
+Baltimore_racesome <- lm(spatialmismatch~BlackProp + AsianProp + HispanicProp, data = Baltimore_finality)
+summary(Baltimore_racesome)
+
+Baltimore_racewb<- lm(spatialmismatch~ WhiteProp + BlackProp, data = Baltimore_finality)
+summary(Baltimore_racewb)
+
+
+
+```
+
+
+```{r eval=FALSE, include=FALSE}
+Baltimore_all <- lm(spatialmismatch ~ WhiteProp + BlackProp +AsianProp + HispanicProp + hsdiplomaProp + hsnodiplomaProp + college1Prop + somecollegeProp + assProp+ bachelorProp, data = Baltimore_finality)
+
+Baltimore_allmodel <- MASS::stepAIC(Seattle_all, direction = "both", 
+                      trace = FALSE)
+summary(Baltimore_all)
+
+```
+
+
+```{r include=FALSE}
+census_access <- left_join(access_json, finality3, by = "GEOID")
+
+
+space <- colorBin(
+  palette = "RdYlBu",
+  domain = census_access$spatialmismatch.x)
+```
+
+
+
+```{r eval=FALSE, include=FALSE}
+
+cutpoints = c(0, 0.05, 0.10, 0.15,0.20, 0.30, 0.50,0.70,1.00)
+
+labels= c("0-0.05", "0.06-0.10", "0.11-0.15", "0.16-0.30", "0.31-0.50", "0.51-0.70","0.71-1.00")
+
+my_colors <- c("#ffffd4", "#fee391", "#fec44f", "#fe9929", "#ec7014", "#cc4c02" , "#8c2d04")
+
+
+
+degree <- colorBin(palette = my_colors, domain = census_access$bachelorProp, bins = cutpoints)
+
+census_access %>%
+  dplyr::filter(MSA.y == "Seattle") %>%
+  sf::st_transform('+proj=longlat +datum=WGS84') %>%
+  leaflet() %>%
+  addTiles() %>%
+  addPolygons(color = "#444444", 
+              weight = 0.5,
+              smoothFactor = 0.5, 
+              fillColor=~degree(round(census_access$bachelorProp,3)), 
+              fillOpacity = 0.8, 
+              highlightOptions = highlightOptions(color = "white", 
+                                                  weight = 2,
+                                                  bringToFront = TRUE), 
+              label = round(census_access$bachelorProp, 3), 
+              labelOptions = labelOptions(
+                    style = list("font-weight" = "normal", padding = "3px 8px"),
+                  textsize = "15px",
+                direction = "auto")) %>%
+  addLegend("bottomright",
+            pal = degree, 
+            values = census_access$bachelorprop,
+            title = "BachelorProp",
+             opacity = 1
+  )
+
+
+```
+
+### PCA
+
+## Seattle 
+
+
+
+
+
+```{r include=FALSE}
+
+Seattle_finality3 <- Seattle_finality %>%
+  select(WhiteProp,AsianProp, HispanicProp, BlackProp, hsdiplomaProp,hsnodiplomaProp,somecollegeProp,college1Prop,assProp,bachelorProp)
+
+
+#Normalizing Data 
+
+normalized_Seattle<- scale(Seattle_finality3)
+
+#Compute Correlation Matrix
+
+Seattlecorr_matrix <- cor(normalized_Seattle)
+ggcorrplot(Seattlecorr_matrix, colors = c("#d8b365", "#f5f5f5", "#5ab4ac"))
+
+#Application 
+
+PCA_Seattle <-princomp(Seattlecorr_matrix)
+summary(PCA_Seattle)
+
+fviz_pca_var(PCA_Seattle, col.var = "cos2", gradient.cols = c("black", "orange", "green"),repel = TRUE)
+
+PCA_Seattle$loadings[, 1:2]
+
+Seattlepcs<-as.matrix(normalized_Seattle %*% PCA_Seattle$loadings[, 1:2])
+Seattlepc <- prcomp(Seattle_finality3, center = TRUE, scale. = TRUE)
+
+Seattle2 <- as.data.frame(cbind(spatialmismatch=Seattle_finality$spatialmismatch, Seattlepc$x[,1:2]))
+
+
+
+```
+
+```{r include=FALSE}
+
+#Seattle Linear Regression with PCA
+
+M1_PCA_Seattle <- lm(spatialmismatch ~ PC1 + PC2, data = Seattle2)
+
+M11_PCA_Seattle <-lm(spatialmismatch ~ PC1, data=Seattle2)
+
+
+summary(M1_PCA_Seattle)
+summary(M11_PCA_Seattle)
+
+qqnorm(M1_PCA_Seattle$resid)
+qqnorm(M11_PCA_Seattle$resid)
+
+```
+
+##Seattle Model 2
+$$ \widehat{Spatial Mismatch} = e^{-0.122946 \cdot PC1  -2.663302} $$
+
+
+This has an $$ R^{2}_{adj} = 0.16$$ We used a logarthmic transformation on 
+spatial mismatch since the linearity model had skewness to the right. Additionally,
+the normality probability plot suggests a slight upward trend reminsicient of a 
+log/polynomial transformation. 
+
+Furthermore,
+our current $$ R^{2}_{adj} $$  has increased from $$ R^{2}_{adj} = 0.13$$. 
+Despite the smaller increase our our predictors we have decieded to go with 
+a simpler model because of the readibility in the interaction between Principal 
+Component 1 and Spatial Mismatch. Recall that Principal Component 1 main contributors were our original variables $\textit{BachelorProp}$ and $\textit{hsdiplomaProp}$. These variables contrasted each other. The variable $\textit{hsdiplomaProp}$ has a negative weight of $-0.43$ which suggests that as the proportion of people who have a high school diploma than typical increase Principal Component 1 will decrease. Since Princpal Component 1 has a negative weight in our overall model, we can say that that there are a higher 
+proportion than average of people who have a high school diploma. 
+
+
+```{r echo=FALSE, warning=FALSE}
+
+qqnorm(M11_PCA_Seattle$resid)
+qqline(M11_PCA_Seattle$fitted)
+ hist(resid(M11_PCA_Seattle))
+
+plot(M11_PCA_Seattle$resid- M11_PCA_Seattle$fitted)
+
+
+Seattle2$logspatialmismatch<-log(Seattle2$spatialmismatch)
+Seattle2$logPC1 <- log(Seattle2$PC1)
+
+Seattle2[is.na(Seattle2)| Seattle2 == "Inf"| Seattle2 == "-Inf"] = NA
+
+
+
+M12_PCA_Seattle <-lm(logspatialmismatch ~ PC1, data=Seattle2)
+summary(M12_PCA_Seattle)
+
+qqnorm(M12_PCA_Seattle$resid)
+hist(M12_PCA_Seattle$resid)
+plot(M12_PCA_Seattle$resid ~ M12_PCA_Seattle$fitted)
+
+M13_PCA_Seattle <- lm(logspatialmismatch ~logPC1, data=Seattle2)
+summary(M13_PCA_Seattle) #Don't use this model, logPCI has less values. 
+
+car::qqPlot(M12_PCA_Seattle)
+
+
+```
+
+Analysis Seattle Best Model: 
+
+Just as a reminder Principal Component 1 for Seattle heaviest weights consist of the 
+variables $\textit{hsdiplomaProp}$ which is the proportion of low-income
+people in block groups that have attained a high school education and $\textit{bachelorProp}$ which is the 
+proportion of low-income people in block groups that have attained a bachelors. 
+
+We see the proportion of low-income people who have attained 
+their high school diploma in block groups is higher than average, the higher the
+spatial mismatch is. Especially looking at the graph when the Principal component 
+One is between -2 and 0, spatial mismatch tends to increase. 
+
+Then as we see the proportion of low-income people who have attained their bacelor's 
+in block groups is higher than average, the lower the spatial mismatch is. We 
+see that as get closer to 4, the spatial mismatch is close to 0. 
+
+Something interesting to note, is that amongst principal component 1, is that the variable $\textit{HispanicrProp}$, $\textit{BlackProp}$ and $\textit{WhiteProp}$
+are all relatively high as well. With $\textit{HispanicrProp} = -0.37 $, $\textit{BlackProp} =  -0.29$  and $\textit{WhiteProp} = 0.29$. In this case, 
+we also see that as Hispanic proportions are higher than average in block groups, 
+principal component 1 will decrease. Similarly, as Black proportions are higher 
+than average in block groups principal component 1 will also decrease. Converslely
+as white proportions are higher than average in block groups, princpal component 1
+will also increase. 
+
+We can say that in general we can say that principal component 1 primarily is seeing 
+characteristics of education, with the heavy emphasis on high school diplomas and 
+bachelor's degrees. 
+
+
+
+
+
+```{r echo=FALSE}
+plot(spatialmismatch ~ PC1, data=Seattle2,
+     xlab = "Principal Component 1", 
+     ylab = "Spatial Mismatch")
+curve(exp(coef(M12_PCA_Seattle)[2]*x + coef(M12_PCA_Seattle)[1]), lwd=2, add =T, col ="blue")
+
+#Use curve fitting, on normal variables using exponents. 
+
+```
+
+## Seattle 3
+
+```{r eval=FALSE, include=FALSE}
+
+Seattle2$sqrtspatialmismatch<-sqrt(Seattle2$spatialmismatch)
+Seattle2$sqrtPC1 <- sqrt(Seattle2$PC1)
+
+M14_PCA_Seattle <-lm(sqrtspatialmismatch ~ PC1, data=Seattle2)
+
+
+
+qqnorm(M14_PCA_Seattle$resid)
+hist(M14_PCA_Seattle$resid)
+
+summary(M14_PCA_Seattle)
+
+summary(lm(spatialmismatch ~ PC1 + I(PC1^2), data = Seattle2))
+
+
+```
+
+
+### Seattle Spatial PCA 
+
+Exact same model as orginal, despite different transformations
+
+```{r}
+
+#Normalizing Data 
+
+normalized_SeattleSpatial<- scale(Seattle_spatial)
+
+#Compute Correlation Matrix
+
+SeattleSpatialcorr_matrix <- cor(normalized_SeattleSpatial)
+ggcorrplot(SeattleSpatialcorr_matrix, colors = c("#d8b365", "#f5f5f5", "#5ab4ac"))
+
+#Application 
+
+PCA_SeattleSpatial <-princomp(SeattleSpatialcorr_matrix)
+summary(PCA_SeattleSpatial)
+
+fviz_pca_var(PCA_SeattleSpatial, col.var = "black")
+
+PCA_SeattleSpatial$loadings[, 1:2]
+
+
+SeattleSpatialpcs<-as.matrix(normalized_SeattleSpatial %*% PCA_SeattleSpatial$loadings[, 1:2])
+SeattleSpatialpc <- prcomp(Seattle_finality3, center = TRUE, scale. = TRUE)
+
+Seattle3 <- as.data.frame(cbind(spatialmismatch=Seattle_finality$spatialmismatch, SeattleSpatialpc$x[,1:2]))
+
+
+
+```
+
+
+###Seattle Spatial Model 1
+
+
+PC2 is not significant we are going to ignore it and focus on the relationship 
+PC1 and spatial mismatch. 
+
+
+```{r}
+
+#Seattle Spatial Linear Regression with PCA
+
+M2_PCA_SeattleSpatial <- lm(spatialmismatch ~ PC1 + PC2, data = Seattle3)
+
+M21_PCA_SeattleSpatial <-lm(spatialmismatch ~ PC1, data=Seattle3)
+
+
+
+summary(M21_PCA_SeattleSpatial)
+
+
+```
+
+
+Analyzing Residuals
+
+```{r}
+qqnorm(M21_PCA_SeattleSpatial$resid)
+hist(M21_PCA_SeattleSpatial$resid)
+
+#trasnformation 
+
+Seattle3$logspatialmismatch<- log(Seattle3$spatialmismatch)
+
+Seattle3[is.na(Seattle3)| Seattle3 == "Inf"| Seattle3 == "-Inf"] = NA
+
+M22_PCA_SeattleSpatial<- lm(logspatialmismatch~PC1, data=Seattle3)
+summary(M22_PCA_SeattleSpatial)
+
+
+qqnorm(M22_PCA_SeattleSpatial$resid)
+
+
+
+
+
+
+```
+
+```{r}
+
+
+summary(lm(spatialmismatch ~ PC1 + I(PC1^2), data = Seattle3))
+
+```
+
+
+
+
+
+
+```{r}
+
+
+Baltimore_finality3 <- Baltimore_finality %>%
+  select(WhiteProp,AsianProp, HispanicProp, BlackProp, hsdiplomaProp,hsnodiplomaProp,somecollegeProp,college1Prop,assProp,bachelorProp)
+
+
+#Normalizing Data 
+
+normalized_Baltimore<- scale(Baltimore_finality3)
+
+#Compute Correlation Matrix
+
+Baltimorecorr_matrix <- cor(normalized_Baltimore)
+ggcorrplot(Baltimorecorr_matrix, colors = c("#d8b365", "#f5f5f5", "#5ab4ac"))
+
+#Application 
+
+PCA_Baltimore <-princomp(Baltimorecorr_matrix)
+summary(PCA_Baltimore)
+
+PCA_Baltimore$loadings[, 1:2]
+
+fviz_pca_var(PCA_Baltimore, col.var = "cos2", gradient.cols = c("black", "orange", "green"),repel = TRUE)
+
+
+Baltimorepcs<-as.matrix(normalized_Baltimore %*% PCA_Baltimore$loadings[, 1:2])
+
+Baltimorepc <- prcomp(Baltimore_finality3, center = TRUE, scale. = TRUE)
+
+Baltimore2 <- as.data.frame(cbind(spatialmismatch=Baltimore_finality$spatialmismatch, Baltimorepc$x[,1:2]))
+
+ 
+
+```
+
+
+
+```{r}
+# Baltimore Fitting Linear Model PCA
+
+
+M1_PCA_Baltimore <- lm(spatialmismatch ~ PC1 + PC2, data = Baltimore2)
+
+M11_PCA_Baltimore <-lm(spatialmismatch ~ PC2, data=Baltimore2)
+
+
+summary(M1_PCA_Baltimore)
+
+summary(M11_PCA_Baltimore)
+
+qqnorm(M11_PCA_Baltimore$resid)
+hist(M11_PCA_Baltimore$resid)
+
+
+
+
+```
+### Baltimore Model 2 
+
+Too much, skew to the left. 
+```{r, warning=FALSE}
+
+Baltimore2$logspatialmismatch<- log(Baltimore2$spatialmismatch)
+
+Baltimore2[is.na(Baltimore2)| Baltimore2 == "Inf"| Baltimore2 == "-Inf"] = NA
+
+M12_PCA_Baltimore<- lm(logspatialmismatch ~ PC2, data= Baltimore2)
+
+summary(M12_PCA_Baltimore)
+hist(M12_PCA_Baltimore$resid)
+
+```
+
+###Baltimore Model 3
+
+$$ \widehat{Spatial Mismatch} = ({-0.0006 \cdot PC2 + 0.282})^2 $$
+
+This has an $$ R^{2}_{adj} = 0.01$$ We used a square root  transformation on 
+spatial mismatch since the linearity model had skewness to the right and 
+logarthmic transfomration was too much. 
+
+Furthermore,
+our current $$ R^{2}_{adj} =0.02$$  has decreased to $$ R^{2}_{adj} = 0.01$$. 
+but we are able to interpret this model with more simplicity. 
+Despite the smaller increase our our predictors we have decieded to go with 
+a simpler model because of the readability in the interaction between Principal 
+Component 2 and Spatial Mismatch. Recall that Principal Component 2 main contributors 
+were our original variables $\textit{BachelorProp}$ ,  $\textit{WhiteProp}$ ,and 
+$\textit{BlackProp}$. These variables contrasted each other. The variable $\textit{BlackPropp}$ has a 
+negative weight of $-0.50$ which suggests that as the proportion of Black people than typical increase Principal Component 2 will decrease. 
+Since Principal Component 2 has a negative weight in our overall model, 
+we can say that that there are a higher proportion than average of people who 
+are black. Additionally with $\textit{BachelorProp} = 0.46 $ and $\textit{WhiteProp} =0.46$ as they proportions are higher than typical in a block group, Principal Component 2 increases. 
+
+This seems to suggest that eductaion and race are factors that play into spatial mismatch. 
+
+
+```{r}
+
+Baltimore2$sqrtspatialmismatch<- sqrt(Baltimore2$spatialmismatch)
+
+Baltimore2[is.na(Baltimore2)| Baltimore2 == "Inf"| Baltimore2 == "-Inf"] = NA
+
+M13_PCA_Baltimore<- lm(sqrtspatialmismatch ~ PC2, data= Baltimore2)
+
+summary(M13_PCA_Baltimore)
+
+hist(M13_PCA_Baltimore$resid)
+qqnorm(M13_PCA_Baltimore$resid)
+
+car::qqPlot(M13_PCA_Baltimore$residuals)
+
+plot(M13_PCA_Baltimore$resid ~ M13_PCA_Baltimore$fitted)
+abline(0,0)
+
+M14_PCA_Baltimore<-lm(spatialmismatch ~ PC2 + I(PC2^2), data = Baltimore2)
+
+```
+### Analyze Baltimore Best Model 3
+
+Observing the data, with out best model, we see that our curve doesn't match the data. 
+With our low $$ R^{2}_{adj} = 0.01$$ we were not expecting a great model. This does 
+suggest that the factors of Race and education ar enot good indicators in prediciting 
+spatial mismatch in Baltimore as much as it is in Seattle. 
+
+Moreover,  the cruve line shows that there isn't any pattern to amongt Principal Componet  2 
+in regards to Spatial Mismatch 
+
+
+
+```{r}
+
+plot(spatialmismatch ~ PC2, data=Baltimore2,
+     xlab = "Principal Component 2", 
+     ylab = "Spatial Mismatch")
+curve((coef(M13_PCA_Baltimore)[1])^2*x^2+2*coef(M13_PCA_Baltimore)[1]*coef(M13_PCA_Baltimore)[2]*x+coef(M13_PCA_Baltimore)[2]^2*x^2, lwd = 2, add =T, col= "blue")
+ 
+ggplot(Baltimore2, aes(x=PC2, y=spatialmismatch)) + geom_point() + geom_smooth()
+
+```
+
+```{r}
+
+
+#Normalizing Data 
+
+normalized_BaltimoreSpatial<- scale(Baltimore_spatial)
+
+#Compute Correlation Matrix
+
+BaltimoreSpatialcorr_matrix <- cor(normalized_BaltimoreSpatial)
+ggcorrplot(BaltimoreSpatialcorr_matrix, colors = c("#d8b365", "#f5f5f5", "#5ab4ac"))
+
+#Application 
+
+PCA_BaltimoreSpatial <-princomp(BaltimoreSpatialcorr_matrix)
+summary(PCA_BaltimoreSpatial)
+
+fviz_pca_var(PCA_BaltimoreSpatial, col.var = "black")
+
+PCA_BaltimoreSpatial$loadings[, 1:2]
+
+
+BaltimoreSpatialpcs<-as.matrix(normalized_BaltimoreSpatial %*% PCA_BaltimoreSpatial$loadings[, 1:2])
+
+BaltimoreSpatialpc <- prcomp(Baltimore_finality3, center = TRUE, scale. = TRUE)
+
+Baltimore2 <- as.data.frame(cbind(spatialmismatch=Baltimore_finality$spatialmismatch, BaltimoreSpatialpc$x[,1:2]))
+
+
+
+
+```
+
+
+
+```{r}
+# Baltimore Fitting Linear Model PCA
+
+
+M2_PCA_BaltimoreSpatial <- lm(spatialmismatch ~ PC1 + PC2, data = Baltimore2)
+
+M21_PCA_BaltimoreSpatial <-lm(spatialmismatch ~ PC2, data=Baltimore2)
+
+
+summary(M2_PCA_BaltimoreSpatial)
+
+summary(M21_PCA_BaltimoreSpatial)
+
+
+
+```
+
+Williams Test:
+
+
+```{r}
+library(psych)
+r.test(n = 2477, cor(Seattle_finality$spatialmismatch,Seattle_finality3$WhiteProp), cor(Baltimore_finality$spatialmismatch,Baltimore_finality$WhiteProp), n2 = 1939, twotailed =TRUE )
+```
+###PCA analysis combined
+
+```{r warning=FALSE}
+
+  final<- finality %>%
+    select(WhiteProp,AsianProp, HispanicProp, BlackProp, hsdiplomaProp,hsnodiplomaProp,somecollegeProp,college1Prop,assProp,bachelorProp)
+
+
+
+#Normalizing Data 
+
+normalized_final<- scale(final)
+
+#Compute Correlation Matrix
+
+corr_matrix <- cor(normalized_final)
+ggcorrplot(corr_matrix, colors = c("#d8b365", "#f5f5f5", "#5ab4ac"))
+
+#Application 
+
+PCA_final <-princomp(corr_matrix)
+
+
+fviz_pca_var(PCA_final, col.var = "cos2", gradient.cols = c("black", "orange", "green"),repel = TRUE)
+
+
+
+PCA_final$loadings[, 1:2]
+
+finalpcs<-as.matrix(normalized_final %*% PCA_final$loadings[, 1:2])
+finalpc <- prcomp(final, center = TRUE, scale. = TRUE)
+
+final2 <- as.data.frame(cbind(spatialmismatch=finality3$spatialmismatch, finalpc$x[,1:2]))
+
+final3 <- as.data.frame(cbind(spatialmismatch=finality3$spatialmismatch, MSA=finality3$MSA,finalpc$x[,1:2]))
+
+
+final3<-final3 %>%
+  mutate(City =ifelse(MSA=="Seattle",1,0))
+
+
+
+
+
+```
+
+
+###Final regression
+
+
+```{r echo=TRUE}
+
+# Linear Regression with PCA
+
+M3_PCA_final<- lm(spatialmismatch ~ PC1 + PC2, data = final2)
+
+summary(M3_PCA_final)
+
+qqnorm(M3_PCA_final$resid)
+hist(M3_PCA_final$resid)
+
+
+final2$logspatialmismatch <- log(finality3$spatialmismatch)
+
+final2[is.na(final2)| final2 == "Inf"| final2 == "-Inf"] = NA
+
+M31_PCA_final<- lm(logspatialmismatch ~ PC1 + PC2, data = final2)
+
+summary(M31_PCA_final)
+
+car::qqPlot(M31_PCA_final$resid)
+hist(M31_PCA_final$resid)
+
+
+
+
+
+
+
+
+
+
+```
+
+### William's Test
+
+```{r eval=FALSE, include=FALSE}
+cor(final2$spatialmismatch,final2$PC1)
+cor(final2$spatialmismatch,final2$PC2)
+
+r.test(n = 2477, cor(Seattle_finality$spatialmismatch,Seattle_finality$PC1),cor(Baltimore_finality$spatialmismatch,Baltimore_finality$PC1), n2 = 1939, twotailed =TRUE )
+
+
+
+```
+
+combine components and then find the correlations. 
+spatial mismatch is related to different components and then try cities
+
+combine different cities into one PCA and then run correlations based on PC. 
+
+
+```{r echo=TRUE}
+Variables <- c("WhiteProp", "AsianProp", "HispanicProp", "BlackProp" , "hsdiplomaProp", "hsnodiplomaProp", "somecollegeProp", "College1Prop", "associateProp", "bachelorProp")
+Principal_Component_1 <- c( 0.29 , 0.11, -0.37, -0.29, -0.43, -0.26, -0.21, -0.26, -0.10, 0.55 )
+Principal_Component_2 <- c(0.57, -0.51, -0.21, -0.33, 0.20, -0.06, 0.25, 0.30, 0.21, -0.11)
+
+Seattle_PCA_Results<-data.frame(Variables,Principal_Component_1, Principal_Component_2)
+
+```
+
+
+```{r echo=TRUE}
+
+PrincipalComponent_2 <- c(0.43, -0.45, -0.23, -0.36, 0.32, -0.007, 0.07, 0.49, 0.35, -0.14)
+
+Baltimore_PCA_Results<- data.frame(Variables, PrincipalComponent_2)
+
+Baltimore_PCA_Results
+```
+
+
+...
+
+
