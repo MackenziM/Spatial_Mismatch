@@ -1,2 +1,3 @@
 # Spatial_Mismatch
-Analyzing Data to see if race and education's impact on spatial mismatch in two cities with different charachteristics
+
+ Analyzing Urban Institutes Unequal Commutes data as found in their article, we  wanted to answer the question between race and education and its impact on spatial mismatch in Baltimore and Seattle. 
